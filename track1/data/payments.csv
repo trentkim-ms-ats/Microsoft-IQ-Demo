@@ -1,0 +1,9 @@
+payment_id,order_id,status
+PAY01,O01,approved
+PAY02,O02,approved
+PAY03,O03,failed
+PAY04,O04,failed
+PAY05,O05,approved
+PAY06,O06,approved
+PAY07,O07,approved
+PAY08,O08,failed

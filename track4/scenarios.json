@@ -1,0 +1,5 @@
+[
+  {"id": "Q1", "question": "캠페인별 주문 결제 승인율과 점검해야 할 근거는?", "semanticKeys": ["WaveDemo", "LoyaltyDemo"], "limitation": "방문자 수가 없어 방문 전환율은 계산하지 않음; 제공자와 시각이 일치하지 않는 외부 장애를 원인으로 단정하지 않음"},
+  {"id": "Q2", "question": "배송 지연 여부에 따라 반품·문의 비율이 어떻게 다른가?", "semanticKeys": ["Nova Phone", "Cedar Laptop"], "limitation": "소규모 합성 상관관계이며 인과관계 아님; 배송 지역과 경로가 없어 외부 경보와 직접 연결 불가"},
+  {"id": "Q3", "question": "상품별 승인 주문 매출과 반품 신호를 어떻게 구분해 볼 것인가?", "semanticKeys": ["Nova Phone", "Orbit Watch", "Cedar Laptop"], "limitation": "반품 차감 전 매출이며 이익 아님; 가상 상품은 실제품 안전 공지와 매칭 불가"}
+]
