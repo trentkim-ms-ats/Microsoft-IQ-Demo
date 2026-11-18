@@ -1,0 +1,17 @@
+{
+  "Q1": {
+    "query": "official payment service availability status history",
+    "allowedDomains": ["status.stripe.com", "www.paypal-status.com"],
+    "boundary": "실제 결제 제공자와 시간대가 확인되지 않아 내부 실패의 원인으로 연결할 수 없음"
+  },
+  "Q2": {
+    "query": "official weather alerts and air traffic status information",
+    "allowedDomains": ["www.weather.gov", "nasstatus.faa.gov"],
+    "boundary": "미국 공식 출처의 위치 예시이며 내부 배송 지역을 모름; 한국 배송 사건 근거가 아님"
+  },
+  "Q3": {
+    "query": "official consumer product recalls and cybersecurity guidance electronics",
+    "allowedDomains": ["www.cpsc.gov", "www.nist.gov"],
+    "boundary": "가상 상품은 공식 리콜 대상과 매칭할 수 없으며 범주 수준 참고만 가능"
+  }
+}

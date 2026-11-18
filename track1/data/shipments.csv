@@ -1,0 +1,6 @@
+shipment_id,order_id,delayed
+S01,O01,1
+S02,O02,0
+S05,O05,0
+S06,O06,1
+S07,O07,0
