@@ -1,5 +1,7 @@
 # Track2 · WorkIQ
 
+**현재 콘텐츠는 독립 예제이며 원본 Track1 14개 CSV와 연결되지 않습니다.**
+
 **목적:** 내부 수치와 관련된 업무 문서·메일·대화를 찾아 출처와 권한을 함께 보여줍니다. 최소 구성은 `합성 콘텐츠 → M365 네 소스 → 권한을 적용한 검색 → 근거 목록`입니다.
 
 ## 포함 자산과 로컬 실행
@@ -15,7 +17,7 @@ python3 tools/demo.py --track work --role guest
 
 ## live 구축: 최소 순서
 
-1. [공통 사전조건](../docs/SETUP.md)과 [Track1](../track1/README.md)의 합성 키/지표를 확인합니다. 데모 전용 M365 사용자 두 명과 전용 사이트·채널·폴더를 준비합니다. 하나는 시연자, 하나는 접근 제한 확인용입니다.
+1. [공통 사전조건](../docs/SETUP.md)과 [Track1](../track1/README.md)의 키/지표를 확인합니다. 현재 예제 콘텐츠와 원본 데이터의 키가 다르므로 실제 결합 전에 정합성을 맞춰야 합니다. 데모 전용 M365 사용자 두 명과 전용 사이트·채널·폴더를 준비합니다.
 2. SharePoint 문서 라이브러리에 [결제 검토](data/content/payment-review.md)와 [상품 검토](data/content/product-review.md)의 내용을 새 문서나 지원되는 파일 형식으로 저장합니다. 수동으로 Word 문서에 옮겨도 됩니다. 원본 Markdown 파일을 색인할 수 있는지는 사용하는 검색 도구에서 확인하세요.
 3. Outlook에서 [결제 메일](data/content/payment-mail.md)의 제목·본문을 샘플 메일로 시연자에게만 보냅니다. 실제 직원·그룹에는 보내지 않습니다. 발신/수신 메일이 생성되므로 의도된 데모 계정인지 다시 확인합니다.
 4. Teams의 **제한 사용자도 가입한 데모 채널**에 [배송 대화](data/content/delivery-thread.md)를 게시합니다. OneDrive에는 [배송 정책](data/content/delivery-policy.md)을 시연자 전용으로 저장하고, [상품 회의](data/content/product-meeting.md)는 두 사용자 모두에게 공유합니다.

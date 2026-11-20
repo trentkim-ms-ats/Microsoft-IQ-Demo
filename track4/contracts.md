@@ -24,11 +24,11 @@
 | Fabric + Work | blocked | 내부 근거 부족으로 분석 차단 |
 | 전부 | blocked | 모든 소스 실패 및 분석 차단 |
 
-성공한 소스의 근거만 포함하고 실패한 소스의 예전 캐시를 현재 성공처럼 재사용하지 않습니다. live 재시도는 일시 오류만 5/10/20초, 최초 호출 포함 4회까지입니다. 로컬의 `*-down`은 재시도 구현이 아니라 **확정 실패 이후 상태**를 모사합니다.
+성공한 소스의 근거만 포함하고 실패한 소스의 예전 캐시를 현재 성공처럼 재사용하지 않습니다. live 재시도는 일시 오류만 5/10/20초, 최초 호출 포함 4회까지입니다.
 
-## 로컬 최종 응답
+## 최종 응답 계약 예시
 
-`tools/demo.py`는 다음 필드를 질문별로 반환합니다.
+실제 어댑터 구현 시 다음 필드를 질문별로 검토합니다. 현재 통합 응답을 생성하는 로컬 러너는 없습니다.
 
 - `scenarioId`, `question`, `executionMode=simulation`, `status`
 - `metrics`: Fabric 집계 목록 또는 실패 시 null
@@ -37,4 +37,4 @@
 - `sourceTrace`: FabricIQ/WorkIQ/WebIQ/FoundryIQ 각각의 상태와 실제 제공된 로컬 자료 참조
 - `warnings`, `limitations`, `analysis`, `humanApprovalRequired=true`
 
-`analysis`는 새로운 원인 해석이나 LLM 생성문이 아니라 근거를 분리해 읽으라는 고정 안내입니다. `FoundryIQ` trace는 로컬 결합기와 정의 파일을 참조하며, 실제 지식 검색/Responses API 호출을 했다는 뜻이 아닙니다.
+실제 지식 검색이나 Responses API를 호출하지 않았다면 그렇게 명시합니다.
