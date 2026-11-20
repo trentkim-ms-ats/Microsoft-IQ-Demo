@@ -1,36 +1,39 @@
 # Track1 · FabricIQ
 
-**목적:** 작은 주문 데이터로 내부 수치를 계산하고 그 수치가 어떤 엔터티·관계를 거쳤는지 보여줍니다. 최소 구성은 `CSV → Lakehouse Delta 테이블 → SQL baseline → Ontology`입니다.
+원본 워크숍의 **14개 CSV 전체**를 고정 버전으로 가져와 Q1~Q5를 분석합니다. 원본 파일은 `track1/data/`에 있습니다. [출처와 재배포 범위](../SOURCES.md)를 확인하세요.
 
-## 포함 자산과 로컬 실행
-
-- [합성 CSV](data/): 8개 테이블, 주문 8건, 가상 상품 3종. 원본 워크숍 CSV와 호환되지 않습니다.
-- [데이터 사전](data/README.md): 키·단위·분모 정의.
-- [Fabric 적재 코드](load_fabric.py): Fabric Notebook에 붙여 실행하는 Spark 코드.
-- [기준 SQL](queries.sql): Q1~Q3 쿼리.
-- [Ontology 매핑](ontology.json): 사람이 구성할 엔터티/관계 명세. 제품 배포용 API 번들이 아닙니다.
+## 로컬 분석
 
 ```bash
-python3 tools/demo.py --track fabric
+python3 track1/workshop.py download
+python3 track1/workshop.py analyze
+python3 -m unittest discover -s tests -v
 ```
 
-`outputs/fabric.json`에 질문별 수치와 원본 CSV 경로가 생깁니다.
+다운로드와 분석 모두 각 파일의 SHA-256과 행 수를 확인합니다. 다운로드는 기존 파일을 검증하고 덮어쓰지 않으며 누락된 파일만 받습니다. 파일 누락·변조 시 실패합니다. 결과는 `outputs/workshop-track1.json`입니다. macOS의 Python에서 인증서 오류가 발생하면 시스템에 설치된 신뢰할 수 있는 CA 번들을 `SSL_CERT_FILE`로 지정하세요.
 
-## live 구축: 최소 순서
+원본 테이블은 `channels`, `customers`, `products`, `campaigns`, `promotions`, `orders`, `order_items`, `payments`, `shipments`, `returns`, `inventory_snapshots`, `order_promotions`, `campaign_attribution`, `support_tickets`입니다. 원본의 의도된 중복·결측·참조 오류는 수정하지 않습니다. 따라서 테이블에는 원본 행을 보존하고 집계할 때 관계와 분모를 명시합니다.
 
-1. [공통 사전조건](../docs/SETUP.md)을 확인합니다. Fabric 용량이 연결된 데모 Workspace에서 Lakehouse 하나와 Notebook 하나를 만듭니다. Ontology Preview가 지원되지 않으면 SQL 데모까지만 가능하다고 표시합니다.
-2. `data/`의 **CSV 8개만** Lakehouse `Files/iq-demo/`에 업로드합니다. README나 원본 워크숍 자료는 업로드할 필요가 없습니다.
-3. Notebook을 해당 Lakehouse에 기본 연결하고 세션을 시작합니다. [적재 코드](load_fabric.py)를 Python 셀에 붙여 실행합니다. 기본 경로는 `/lakehouse/default/Files/iq-demo`이며 다르면 `DATA_ROOT` 한 곳을 바꿉니다. `demo_` 접두사의 Delta 테이블을 생성합니다. 같은 테이블이 있으면 덮어쓰지 않고 실패합니다.
-4. [SQL](queries.sql)의 Q1~Q3를 Notebook의 `%%sql` 셀에서 **쿼리별로** 실행합니다. SQL analytics endpoint를 쓰면 테이블 동기화를 기다린 뒤 같은 테이블을 조회합니다.
-5. 포털에서 Ontology를 만들고 [매핑 명세](ontology.json)에 있는 엔터티를 추가합니다. 각 `key`를 식별 키에, `properties`를 같은 테이블 컬럼에 바인딩한 뒤 `relationships`의 양끝 키를 연결합니다. 실제 생성된 item ID와 이름은 로컬 운영 기록에만 보관합니다. 명세 JSON을 제품 API에 직접 POST하지 않습니다.
-6. `Campaign → Order → Payment`, `Order → Shipment/Return/Ticket`, `Product → OrderLine` 경로를 탐색합니다. UI의 지원 범위가 다르면 SQL 관계로 설명하고 실제 Ontology 탐색이 미검증임을 밝힙니다.
+## Fabric 적재 및 분석
 
-## 시연·확인
+1. 용량이 연결된 Fabric Workspace에서 Lakehouse와 Notebook을 만들고 Notebook의 기본 Lakehouse를 연결합니다.
+2. 검증된 `track1/data/`의 CSV 14개를 Lakehouse의 `Files/` 루트에 업로드합니다. 기존 파일을 덮어쓰지 마세요.
+3. [적재 코드](load_fabric.py)를 Notebook Python 셀에서 실행합니다. `workshop_` 테이블 14개가 이미 있으면 중단합니다. 파일 해시와 행 수를 먼저 확인하고 Delta 테이블로 저장한 뒤 행 수를 재확인합니다. 중간 실패 시 이미 생성된 테이블을 확인하고 별도로 정리한 후 재시도합니다.
+4. [Q1~Q5 SQL](queries.sql)을 각각 Notebook의 SQL 셀에서 실행하고 로컬 결과와 비교합니다. 스키마는 원본 상태를 보존하기 위해 문자열로 적재합니다. 날짜·숫자·상태는 쿼리 또는 별도 표준화 계층에서 명시적으로 변환합니다.
+5. Ontology는 실제 Preview 지원 및 데이터 품질 확인 후 [14개 테이블 설계 초안](ontology.md)을 바탕으로 별도 구성합니다.
 
-Q1은 `WaveDemo` 50%, `LoyaltyDemo` 75%입니다. **방문자 대비 전환율이 아니라 주문 대비 승인율**입니다. Q2는 배송 지연 주문의 반품/문의 비율을 비교합니다. Q3는 상품별 승인 주문 매출과 배송 주문의 반품률을 보여줍니다. 합성 상관관계이지 원인 증거가 아닙니다.
+## 지표와 해석
 
-다음 [WorkIQ](../track2/README.md)에 캠페인·상품 이름, [데이터 사전](data/README.md)의 분모, SQL 결과를 전달합니다. live는 Workspace/Ontology 식별자와 실제 매핑도 별도 전달합니다.
+| 질문 | 집계 방식과 한계 |
+| --- | --- |
+| Q1 | 캠페인 귀속 주문을 중복 제거하고 결제 성공/재시도 성공 여부를 주문 단위로 집계합니다. 미확인 상태는 `unknown_orders`로 분리합니다. 방문자 전환율은 아닙니다. |
+| Q2 | 배송 상태가 한 번이라도 `Delayed`인 주문과 나머지 주문의 반품·불만 티켓 비율을 비교합니다. 미배송 `InTransit`도 비지연군에 포함됩니다. |
+| Q3 | 프로모션 유형별 `net_amount / gross_amount`와 전체 이력에서 2회 이상 주문한 고객 비율을 보여줍니다. 실제 원가 기반 마진이나 프로모션 이후 재구매율이 아닙니다. |
+| Q4 | 어느 시점이든 품절 스냅샷이 있는 상품을 포함한 주문의 취소율·주문당 문의를 비교합니다. 주문 시점의 품절 여부나 인과관계를 증명하지 않습니다. |
+| Q5 | 채널·등급·반품 사유별 고객을 중복 제거해 전체 이력 기준 반복 주문 비율을 계산합니다. 반품 이후 재구매 여부는 아닙니다. |
 
-## 정리
+원본의 기준 질문과 데이터 설명은 [워크숍 Track1](https://github.com/trentkim-ms-ats/microsoft-iq-workshop/tree/b16d5fd8ed481f86eb47d5d4625268ef65a7793b/track1)을 참고하세요. 원본 CSV에는 의도된 데이터 품질 문제가 있으므로 결과는 데모용 신호이며 운영 의사결정에 사용하지 않습니다.
 
-이번에 만든 `demo_` 테이블과 Ontology/Notebook만 제거합니다. 공유 Lakehouse 전체를 삭제하지 않습니다. 전용 용량은 [비용·정리](../docs/SETUP.md)에 따라 처리합니다.
+## 범위
+
+Track2~4의 업무 근거는 원본 데이터와 아직 정합성을 검증하지 않았습니다.

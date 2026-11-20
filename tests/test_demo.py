@@ -1,6 +1,8 @@
 import ast
 import json
 import re
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 from urllib.parse import unquote
@@ -9,46 +11,23 @@ from tools import demo
 
 
 class DemoTests(unittest.TestCase):
-    def test_metrics_and_denominators(self):
-        metrics = demo.fabric()
-        self.assertEqual([r["approval_rate_pct"] for r in metrics["Q1"]], [50, 75])
-        self.assertEqual([r["order_count"] for r in metrics["Q1"]], [4, 4])
-        self.assertEqual([r["returned_orders"] for r in metrics["Q2"]], [0, 2])
-        self.assertEqual([r["contacted_orders"] for r in metrics["Q2"]], [1, 2])
-        self.assertEqual([r["return_rate_pct"] for r in metrics["Q2"]], [0, 100])
-        self.assertEqual([r["revenue_krw"] for r in metrics["Q3"]],
-                         [200000, 200000, 200000])
-        self.assertEqual([r["return_rate_pct"] for r in metrics["Q3"]], [50, 0, 100])
+    def test_removed_legacy_tracks_are_rejected(self):
+        for track in ("fabric", "all", "foundry"):
+            result = subprocess.run(
+                [sys.executable, str(demo.ROOT / "tools/demo.py"), "--track", track],
+                capture_output=True, text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("invalid choice", result.stderr)
 
-    def test_guest_no_restricted_evidence_or_traces(self):
+    def test_guest_no_restricted_evidence(self):
         evidence = demo.work("guest")
         self.assertEqual({item["id"] for item in evidence}, {"D01", "D03", "D06"})
-        responses = demo.combine(demo.fabric(), evidence, demo.web(), "normal", "guest")
-        serialized = json.dumps(responses)
+        serialized = json.dumps(evidence)
         for item in demo.work("presenter"):
             if "guest" not in item["roles"]:
                 self.assertNotIn(item["path"], serialized)
                 self.assertNotIn(item["id"], serialized)
-
-    def test_failure_contract_all_scenarios(self):
-        for mode, failed in demo.MODES.items():
-            with self.subTest(mode=mode):
-                responses = demo.combine(demo.fabric(), demo.work("presenter"),
-                                         demo.web(), mode, "presenter")
-                blocked = {"FabricIQ", "WorkIQ"}.issubset(failed)
-                expected = "blocked" if blocked else ("partial" if failed else "complete")
-                for response in responses:
-                    self.assertEqual(response["status"], expected)
-                    self.assertTrue(response["humanApprovalRequired"])
-                    self.assertEqual(response["executionMode"], "simulation")
-                    self.assertEqual(response["analysis"] is None, blocked)
-                    self.assertEqual(response["metrics"] is None, "FabricIQ" in failed)
-                    self.assertEqual(not response["evidenceLinks"], "WorkIQ" in failed)
-                    self.assertEqual(not response["webCitations"], "WebIQ" in failed)
-                    for trace in response["sourceTrace"]:
-                        if trace["source"] in failed:
-                            self.assertEqual(trace["references"], [])
-                            self.assertEqual(trace["status"], "failed")
 
     def test_fixture_cannot_claim_live_fact_or_unapproved_host(self):
         original = demo.read_json
@@ -89,13 +68,6 @@ class DemoTests(unittest.TestCase):
                     relative = unquote(target.split("#", 1)[0])
                     self.assertTrue((path.parent / relative).exists(),
                                     f"{path.relative_to(root)} -> {target}")
-        ontology = demo.read_json("track1/ontology.json")
-        names = {entity["name"] for entity in ontology["entities"]}
-        self.assertEqual(len(names), 8)
-        for relation in ontology["relationships"]:
-            self.assertIn(relation["from"].split(".")[0], names)
-            self.assertIn(relation["to"].split(".")[0], names)
-
 
 if __name__ == "__main__":
     unittest.main()
