@@ -51,7 +51,7 @@ WITH unique_orders AS (
   FROM workshop_order_promotions op JOIN workshop_promotions p ON p.promotion_id = op.promotion_id
 )
 SELECT po.promotion_type, COUNT(*) AS orders_count,
-       ROUND(1.0 * SUM(CAST(o.net_amount AS DOUBLE)) / NULLIF(SUM(CAST(o.gross_amount AS DOUBLE)), 0), 4) AS net_to_gross,
+       ROUND(1.0 * SUM(CAST(o.net_amount AS FLOAT)) / NULLIF(SUM(CAST(o.gross_amount AS FLOAT)), 0), 4) AS net_to_gross,
        ROUND(100.0 * AVG(rc.is_repeat), 2) AS repeat_customer_pct
 FROM promotion_orders po JOIN unique_orders o ON o.order_id = po.order_id
 JOIN repeat_customers rc ON rc.customer_id = o.customer_id
@@ -60,7 +60,7 @@ GROUP BY po.promotion_type ORDER BY po.promotion_type;
 -- Q4: ever-stockout product flag; snapshot date is not matched to order date.
 WITH stockout_products AS (
   SELECT DISTINCT product_id FROM workshop_inventory_snapshots
-  WHERE CAST(on_hand_qty AS DOUBLE) - CAST(reserved_qty AS DOUBLE) <= 0
+  WHERE CAST(on_hand_qty AS FLOAT) - CAST(reserved_qty AS FLOAT) <= 0
 ), order_flags AS (
   SELECT o.order_id,
          MAX(CASE WHEN sp.product_id IS NOT NULL THEN 1 ELSE 0 END) AS has_stockout_product,

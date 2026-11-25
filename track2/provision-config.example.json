@@ -1,0 +1,7 @@
+{
+  "tenantId": "REPLACE_WITH_DEDICATED_DEMO_TENANT_ID",
+  "publisherUpn": "REPLACE_WITH_LICENSED_PUBLISHER_UPN",
+  "restrictedUpn": "REPLACE_WITH_LICENSED_RESTRICTED_TEST_UPN",
+  "teamDisplayName": "IQ Workshop Live Demo",
+  "teamDescription": "Private Team for the live Microsoft IQ workshop."
+}

@@ -1,11 +1,5 @@
 {
-  "executionMode": "simulation",
-  "items": [
-    {"id": "D01", "source": "SharePoint", "title": "WaveDemo 결제 점검", "scenarios": ["Q1"], "roles": ["presenter", "guest"], "path": "track2/data/content/payment-review.md"},
-    {"id": "D02", "source": "Outlook", "title": "LoyaltyDemo 승인 흐름 검토 요청", "scenarios": ["Q1"], "roles": ["presenter"], "path": "track2/data/content/payment-mail.md"},
-    {"id": "D03", "source": "Teams", "title": "배송 담당 데모 채널 기록", "scenarios": ["Q2"], "roles": ["presenter", "guest"], "path": "track2/data/content/delivery-thread.md"},
-    {"id": "D04", "source": "OneDrive", "title": "배송 문의 분류 기준", "scenarios": ["Q2"], "roles": ["presenter"], "path": "track2/data/content/delivery-policy.md"},
-    {"id": "D05", "source": "SharePoint", "title": "상품 반품 검토 메모", "scenarios": ["Q3"], "roles": ["presenter"], "path": "track2/data/content/product-review.md"},
-    {"id": "D06", "source": "OneDrive", "title": "상품 담당 회의 기록", "scenarios": ["Q3"], "roles": ["presenter", "guest"], "path": "track2/data/content/product-meeting.md"}
-  ]
+  "executionMode": "live",
+  "dataset": "workshop",
+  "manifest": "track2/data/workshop/generated/manifests/content_catalog.json"
 }

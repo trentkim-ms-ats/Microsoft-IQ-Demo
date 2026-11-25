@@ -1,0 +1,32 @@
+{
+  "tenantId": "REPLACE_WITH_DEDICATED_DEMO_TENANT_ID",
+  "publisherUpn": "REPLACE_WITH_LICENSED_PUBLISHER_UPN",
+  "sharepoint": {
+    "driveId": "REPLACE_WITH_DEDICATED_SHAREPOINT_LIBRARY_DRIVE_ID",
+    "aclFolders": {
+      "Workshop-Participants": "IQ-Workshop/Participants",
+      "Workshop-Leaders": "IQ-Workshop/Leaders",
+      "Workshop-Data-Stewards": "IQ-Workshop/Data-Stewards"
+    }
+  },
+  "onedrive": {
+    "driveId": "REPLACE_WITH_DEDICATED_DEMO_USER_DRIVE_ID",
+    "aclFolders": {
+      "Workshop-Participants": "IQ-Workshop/Participants",
+      "Workshop-Leaders": "IQ-Workshop/Leaders",
+      "Workshop-Data-Stewards": "IQ-Workshop/Data-Stewards"
+    }
+  },
+  "teams": {
+    "teamId": "REPLACE_WITH_DEDICATED_DEMO_TEAM_ID",
+    "channels": {
+      "cs-tier2": "REPLACE_WITH_CHANNEL_ID",
+      "logistics": "REPLACE_WITH_CHANNEL_ID",
+      "inventory": "REPLACE_WITH_CHANNEL_ID",
+      "payments": "REPLACE_WITH_CHANNEL_ID",
+      "campaign-ops": "REPLACE_WITH_CHANNEL_ID",
+      "data-quality": "REPLACE_WITH_CHANNEL_ID",
+      "leadership-briefing": "REPLACE_WITH_CHANNEL_ID"
+    }
+  }
+}

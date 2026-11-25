@@ -1,17 +1,23 @@
 {
+  "executionMode": "live",
   "Q1": {
-    "query": "official payment service availability status history",
-    "allowedDomains": ["status.stripe.com", "www.paypal-status.com"],
-    "boundary": "실제 결제 제공자와 시간대가 확인되지 않아 내부 실패의 원인으로 연결할 수 없음"
+    "query": "Authoritative public guidance on distinguishing initial payment authorization failures from successful payment retries in ecommerce reporting.",
+    "boundary": "공개 지침은 내부 결제 제공자, 실제 장애 또는 개별 주문 원인을 증명하지 않습니다."
   },
   "Q2": {
-    "query": "official weather alerts and air traffic status information",
-    "allowedDomains": ["www.weather.gov", "nasstatus.faa.gov"],
-    "boundary": "미국 공식 출처의 위치 예시이며 내부 배송 지역을 모름; 한국 배송 사건 근거가 아님"
+    "query": "Authoritative public guidance on measuring delivery delay, returns, and customer complaints without inferring causation.",
+    "boundary": "공개 지침은 샘플 주문의 실제 배송 경로와 시간대를 확인하지 않습니다."
   },
   "Q3": {
-    "query": "official consumer product recalls and cybersecurity guidance electronics",
-    "allowedDomains": ["www.cpsc.gov", "www.nist.gov"],
-    "boundary": "가상 상품은 공식 리콜 대상과 매칭할 수 없으며 범주 수준 참고만 가능"
+    "query": "Authoritative public definitions and reporting caveats for retail promotion discounts, gross sales, net sales, and repeat-customer metrics.",
+    "boundary": "공개 지침은 Track1 원가를 제공하지 않으므로 net-to-gross를 이익이나 마진으로 바꾸지 않습니다."
+  },
+  "Q4": {
+    "query": "Authoritative public guidance on retail inventory stockout snapshots, order cancellations, and interpreting operational comparisons.",
+    "boundary": "공개 지침은 샘플 스냅샷 시점과 주문 시점의 일치를 보장하지 않습니다."
+  },
+  "Q5": {
+    "query": "Authoritative public guidance on segmenting retail returns by channel and customer tier while defining repeat-purchase measurement windows.",
+    "boundary": "공개 지침은 Track1의 고객 주문 이력을 재계산하지 않습니다."
   }
 }

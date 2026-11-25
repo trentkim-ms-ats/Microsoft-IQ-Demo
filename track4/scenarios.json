@@ -1,5 +1,27 @@
-[
-  {"id": "Q1", "question": "캠페인별 주문 결제 승인율과 점검해야 할 근거는?", "semanticKeys": ["WaveDemo", "LoyaltyDemo"], "limitation": "방문자 수가 없어 방문 전환율은 계산하지 않음; 제공자와 시각이 일치하지 않는 외부 장애를 원인으로 단정하지 않음"},
-  {"id": "Q2", "question": "배송 지연 여부에 따라 반품·문의 비율이 어떻게 다른가?", "semanticKeys": ["Nova Phone", "Cedar Laptop"], "limitation": "소규모 합성 상관관계이며 인과관계 아님; 배송 지역과 경로가 없어 외부 경보와 직접 연결 불가"},
-  {"id": "Q3", "question": "상품별 승인 주문 매출과 반품 신호를 어떻게 구분해 볼 것인가?", "semanticKeys": ["Nova Phone", "Orbit Watch", "Cedar Laptop"], "limitation": "반품 차감 전 매출이며 이익 아님; 가상 상품은 실제품 안전 공지와 매칭 불가"}
-]
+{
+  "Q1": {
+    "question": "캠페인별 주문 결제 승인율은 어떠하며 어떤 업무 근거가 이를 설명하거나 제한하는가?",
+    "workSearchTerms": ["SummerPush", "RetrySuccess", "PAY00019", "AeroPhone X"],
+    "limitations": "방문자 수가 없어 방문 전환율을 계산하지 않습니다. RetrySuccess는 상태와 재시도 여부가 섞인 비표준 값이고 원인 확정은 공개 검색만으로 할 수 없습니다."
+  },
+  "Q2": {
+    "question": "배송 지연 그룹과 그 외 주문의 반품·불만 비율은 어떻게 다른가?",
+    "workSearchTerms": ["Delayed", "LateDelivery", "AeroPhone X", "NoTrackingUpdate"],
+    "limitations": "InTransit는 지연으로 보지 않으며 결과는 합성 워크샵 데이터의 관찰 비교이지 인과관계가 아닙니다. 공개 출처는 개별 주문의 배송 경로를 입증하지 않습니다."
+  },
+  "Q3": {
+    "question": "프로모션 유형별 net-to-gross 비율과 반복 구매 고객 비율은 어떻게 다른가?",
+    "workSearchTerms": ["FlashWeek", "Percent", "Amount", "Bundle", "BOGO"],
+    "limitations": "net-to-gross는 할인 효과의 대리 지표이지 원가 기반 마진이 아니며 반복 구매는 전체 이력 기준입니다. 프로모션 이후 재구매나 인과관계를 증명하지 않습니다."
+  },
+  "Q4": {
+    "question": "품절 스냅샷에 등장하는 상품을 포함한 주문과 나머지 주문의 취소율·문의량은 어떻게 다른가?",
+    "workSearchTerms": ["stockout", "on_hand", "reserved", "AeroPhone X", "SmartWatch Pro"],
+    "limitations": "재고 스냅샷 시점은 주문 시점과 일치하지 않을 수 있으며 차이는 인과관계를 증명하지 않습니다."
+  },
+  "Q5": {
+    "question": "채널·고객 등급·반품 사유별 고객의 전체 이력 반복 구매 비율은 어떠한가?",
+    "workSearchTerms": ["Platinum", "DailyTee Cotton", "NotAsDescribed", "return", "repeat customer"],
+    "limitations": "반복 구매는 전체 주문 이력 기준이며 반품 이후 재구매 여부가 아닙니다. 결측 고객 등급은 보완하지 않습니다."
+  }
+}
