@@ -1,3 +1,5 @@
+import ast
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,6 +32,32 @@ class WorkshopTests(unittest.TestCase):
     def test_fabric_manifest_matches_download_manifest(self):
         self.assertEqual(load_fabric.ROWS, {name: count for name, (_, count) in workshop.FILES.items()})
         self.assertEqual(load_fabric.SHA256, {name: digest for name, (digest, _) in workshop.FILES.items()})
+
+    def test_korean_fabric_notebook_has_readable_multiline_sql(self):
+        path = Path(__file__).resolve().parents[1] / "track1/IQ_Workshop_Track1_KO.ipynb"
+        notebook = json.loads(path.read_text(encoding="utf-8"))
+        markdown = "\n".join(
+            "\n".join(cell["source"])
+            for cell in notebook["cells"]
+            if cell["cell_type"] == "markdown"
+        )
+        self.assertIn("원본 14개 CSV", markdown)
+        query_cells = [
+            cell for cell in notebook["cells"]
+            if cell["cell_type"] == "code" and any("sql_q" in line for line in cell["source"])
+        ]
+        self.assertEqual(len(query_cells), 5)
+        for cell in query_cells:
+            tree = ast.parse("".join(cell["source"]))
+            query_assignment = next(
+                node for node in tree.body
+                if isinstance(node, ast.Assign)
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id.startswith("sql_q")
+            )
+            query = ast.literal_eval(query_assignment.value)
+            self.assertIn("\n", query)
+            self.assertIn("Q", query.splitlines()[0])
 
     @unittest.skipUnless(
         all((workshop.DATA / f"{name}.csv").is_file() for name in workshop.FILES),

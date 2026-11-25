@@ -1,10 +1,13 @@
-"""Paste into a Fabric notebook attached to the target Lakehouse."""
+"""기본 Lakehouse를 연결한 Fabric Notebook에서 실행하는 원본 CSV 적재 코드."""
 
-from pathlib import Path
+import csv
 import hashlib
+import io
+from pathlib import Path
 
 DATA_ROOT = Path("/lakehouse/default/Files")
 SPARK_DATA_ROOT = "Files"
+# 원본 CSV별 예상 행 수와 SHA-256입니다. 데이터가 바뀌면 적재를 중단합니다.
 ROWS = {
     "channels": 4, "customers": 1200, "products": 1200, "campaigns": 1000,
     "promotions": 1000, "orders": 2003, "order_items": 4024, "payments": 2004,
@@ -29,21 +32,44 @@ SHA256 = {
 }
 
 
-def load(spark):
-    existing = [f"workshop_{name}" for name in ROWS
-                if spark.catalog.tableExists(f"workshop_{name}")]
-    if existing:
-        raise RuntimeError(f"Existing tables; review before loading: {existing}")
-    frames = {}
+def verify_source_files():
+    """CSV의 원본 해시, 열 머리글, 행 수를 확인하고 열 이름을 반환합니다."""
+    headers = {}
     for name, expected in ROWS.items():
         path = DATA_ROOT / f"{name}.csv"
         if not path.is_file():
             raise FileNotFoundError(path)
-        if hashlib.sha256(path.read_bytes()).hexdigest() != SHA256[name]:
+        content = path.read_bytes()
+        if hashlib.sha256(content).hexdigest() != SHA256[name]:
             raise ValueError(f"{name}: SHA-256 mismatch")
+        with io.StringIO(content.decode("utf-8-sig"), newline="") as stream:
+            reader = csv.reader(stream, strict=True)
+            columns = next(reader, None)
+            if not columns or len(columns) != len(set(columns)):
+                raise ValueError(f"{name}: invalid or duplicate CSV headers")
+            actual_rows = sum(1 for _ in reader)
+        if actual_rows != expected:
+            raise ValueError(f"{name}: expected {expected} rows, got {actual_rows}")
+        headers[name] = columns
+        print(f"{name}.csv: {actual_rows}행, 원본 해시 일치")
+    return headers
+
+
+def load(spark):
+    # 기존 테이블은 덮어쓰지 않습니다. 재적재 전에는 테이블을 직접 검토하세요.
+    existing = [f"workshop_{name}" for name in ROWS
+                if spark.catalog.tableExists(f"workshop_{name}")]
+    if existing:
+        raise RuntimeError(f"Existing tables; review before loading: {existing}")
+    headers = verify_source_files()
+    frames = {}
+    for name, expected in ROWS.items():
+        # Spark에서 Lakehouse Files의 CSV를 읽고 CSV 열 이름이 같은지 확인합니다.
         frame = (spark.read.option("header", True).option("inferSchema", False)
                  .option("mode", "FAILFAST").option("multiLine", True)
                  .csv(f"{SPARK_DATA_ROOT}/{name}.csv"))
+        if frame.columns != headers[name]:
+            raise ValueError(f"{name}: CSV column mismatch")
         actual = frame.count()
         if actual != expected:
             raise ValueError(f"{name}: expected {expected} rows, got {actual}")
@@ -52,6 +78,7 @@ def load(spark):
     try:
         for name, frame in frames.items():
             table = f"workshop_{name}"
+            # 원본 컬럼을 문자열로 보존해 의도된 데이터 품질 사례를 변경하지 않습니다.
             frame.write.format("delta").mode("errorifexists").saveAsTable(table)
             created.append(table)
             if spark.table(table).count() != ROWS[name]:
@@ -64,4 +91,5 @@ def load(spark):
 if __name__ == "__main__":
     from pyspark.sql import SparkSession
 
+    # Fabric Notebook에 연결된 Spark 세션으로 적재합니다.
     load(SparkSession.builder.getOrCreate())

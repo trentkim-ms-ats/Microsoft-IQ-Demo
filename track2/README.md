@@ -1,37 +1,135 @@
-# Track2 · WorkIQ
+# Track2 · WorkIQ (live)
 
-**현재 콘텐츠는 독립 예제이며 원본 Track1 14개 CSV와 연결되지 않습니다.**
+WorkIQ uses live Microsoft 365 with a delegated Graph token. The [original workshop package](data/workshop/README.md) contains 60 content items: 15 SharePoint DOCX files, 12 OneDrive DOCX files, 15 Outlook EML messages, and 18 Teams threads containing 55 messages.
 
-**목적:** 내부 수치와 관련된 업무 문서·메일·대화를 찾아 출처와 권한을 함께 보여줍니다. 최소 구성은 `합성 콘텐츠 → M365 네 소스 → 권한을 적용한 검색 → 근거 목록`입니다.
+## Prerequisites
 
-## 포함 자산과 로컬 실행
+Use an isolated Microsoft 365 demo tenant. Before running provisioning, confirm that:
 
-[catalog.json](data/catalog.json)은 업무 항목 6개의 ID·소스·질문·역할을 연결합니다. [content/](data/content/)의 짧은 본문을 수동 게시에 사용할 수 있습니다. Q1~Q3 각각 공개 데모 역할용 1개와 제한 역할용 1개가 있습니다. `presenter`는 6개, `guest`는 3개를 조회합니다.
+- **Entra administrator:** An account in the target tenant can grant the requested Microsoft Graph delegated permissions. The verified run used a `Global Administrator` for this step. If the administrator and publisher are separate, the publisher does not need that role.
+- **Licensed publisher:** The account configured as `publisherUpn` has active **Teams, SharePoint Online, and Exchange Online** service plans. Confirm that the account can use Teams, access the SharePoint document library and its own OneDrive, and open its Exchange Online mailbox for the Outlook samples. A tenant subscription alone does not activate these services for the publisher.
+- **App registration and consent:** Register `IQ Workshop Provisioner` as a single-tenant public client in Microsoft Entra ID. An authorized administrator must approve the required Microsoft Graph **delegated permissions for `publisherUpn` only** (`Principal` consent), not for all users in the tenant. App registration alone does not grant consent. After approval, sign in to this app as the publisher to obtain a delegated Graph token.
+
+A separate licensed restricted test account is required only for the two-account access checks. Omit it when following the [publisher-only option](#publisher-only-option). The provisioner does not create accounts, assign licenses, or change tenant-wide policies.
+
+In the verified publisher-only run, the account in `track2/provision-config.local.json` served as both administrator and publisher. Its `Global Administrator` role and all three service plans were confirmed, and the app's delegated consent was verified for that account only.
+
+Install the live Python dependencies (`python3 -m pip install -r requirements-live.txt`). App registration and administrator consent also require Azure CLI. The provisioning, publishing, and verification commands can sign in with `--interactive` against the registered app; the resulting tokens stay in memory. No tenant IDs, credentials, generated configs, or live receipts are shipped with the demo.
+
+## 1. Provision isolated M365 targets
+
+Copy `track2/provision-config.example.json` to the ignored local path and set the exact tenant ID, `publisherUpn`, and Team name. Set `restrictedUpn` only if running the two-account checks:
 
 ```bash
-python3 tools/demo.py --track work
-python3 tools/demo.py --track work --role guest
+cp track2/provision-config.example.json track2/provision-config.local.json
 ```
 
-`outputs/work.json`에는 허용된 근거만 기록합니다. 로컬 링크는 파일 경로이고 M365 링크가 아닙니다. 역할 문자열 필터는 **권한 경계를 설명하는 모형일 뿐 인증·M365 ACL 구현이 아닙니다**.
+### Register a delegated Graph app for publisher-only setup
 
-## live 구축: 최소 순서
+After signing in to Azure CLI as the configured publisher, the following commands first show a local plan and then register a single-tenant public client and its service principal using Microsoft Graph:
 
-1. [공통 사전조건](../docs/SETUP.md)과 [Track1](../track1/README.md)의 키/지표를 확인합니다. 현재 예제 콘텐츠와 원본 데이터의 키가 다르므로 실제 결합 전에 정합성을 맞춰야 합니다. 데모 전용 M365 사용자 두 명과 전용 사이트·채널·폴더를 준비합니다.
-2. SharePoint 문서 라이브러리에 [결제 검토](data/content/payment-review.md)와 [상품 검토](data/content/product-review.md)의 내용을 새 문서나 지원되는 파일 형식으로 저장합니다. 수동으로 Word 문서에 옮겨도 됩니다. 원본 Markdown 파일을 색인할 수 있는지는 사용하는 검색 도구에서 확인하세요.
-3. Outlook에서 [결제 메일](data/content/payment-mail.md)의 제목·본문을 샘플 메일로 시연자에게만 보냅니다. 실제 직원·그룹에는 보내지 않습니다. 발신/수신 메일이 생성되므로 의도된 데모 계정인지 다시 확인합니다.
-4. Teams의 **제한 사용자도 가입한 데모 채널**에 [배송 대화](data/content/delivery-thread.md)를 게시합니다. OneDrive에는 [배송 정책](data/content/delivery-policy.md)을 시연자 전용으로 저장하고, [상품 회의](data/content/product-meeting.md)는 두 사용자 모두에게 공유합니다.
-5. 실제 파일별 권한은 catalog의 `roles` 의도와 맞춥니다. SharePoint 결제 검토는 두 사용자에게 허용하고, 메일·OneDrive 배송 정책·SharePoint [상품 검토](data/content/product-review.md)는 **시연자만** 접근하게 합니다. 제한 파일은 상속 중단 등 조직 정책이 허용하는 방법으로 권한을 설정합니다. 문서 제목/본문의 역할 표시는 ACL을 설정하지 않습니다.
-6. 별도 로컬 운영 기록에 각 항목의 실제 원본 URL/ID, 작성·수정 시각, 위치, 허용 사용자/그룹을 남깁니다. `example.invalid`나 로컬 경로를 실근거 링크로 사용하지 않습니다. 이 기록은 공개 저장소에 추가하지 않습니다.
-7. 조직이 승인한 WorkIQ/M365 검색 도구 또는 API로 `WaveDemo`, `LoyaltyDemo`, `Nova Phone`, `Orbit Watch`, `Cedar Laptop`을 검색합니다. **본문도 포함된 색인**인지 확인하고 전파 지연을 기다립니다. API별로 검색 가능한 소스가 다르므로 네 소스가 모두 지원된다고 가정하지 않습니다. 미지원 소스는 해당 소스의 승인된 조회 API/도구를 추가 연결해야 합니다.
-8. 두 사용자로 각각 검색과 원본 열기를 확인합니다. 제한 사용자의 응답·citation·로그에 제한 항목 제목/본문/URL이 없어야 합니다. `403`을 숨기거나 앱 전용 전체 읽기로 우회하지 않습니다.
+```bash
+python3 -m tools.register_m365_app --config track2/provision-config.local.json --full-demo
+python3 -m tools.register_m365_app --config track2/provision-config.local.json \
+  --full-demo --apply --confirm-tenant <exact-tenant-id>
+```
 
-## 시연·확인
+The commands use `--full-demo` to add publishing and search scopes to the publisher-only provisioning scopes and register the `http://localhost` redirect for interactive browser sign-in. IDs are saved in the ignored `track2/entra-app-state.local.json`. Registration does **not** grant consent or create a secret. If an app with the same name already exists, it stops rather than adopting it. To reuse an explicitly identified app, pass `--existing-app-object-id <application-object-id>`; its settings and permissions must exactly match. If a write times out, inspect the tenant before retrying.
 
-Q1은 결제율 자체가 아니라 점검 요청과 검증되지 않은 원인 후보를, Q2는 배송 대화와 정책의 구분을, Q3는 상품 검토와 회의의 구분을 보여줍니다. 업무 메모는 지표를 대체하지 않으며 웹 페이지도 내부 업무 근거가 아닙니다.
+Use the following commands for publisher-only consent. Do not use the Entra portal's **Grant admin consent for [tenant]** action, which grants consent tenant-wide. Use a separate Azure CLI config directory outside the repository:
 
-다음 [WebIQ](../track3/README.md)에는 **일반화된 외부 질문만** 넘기고 내부 본문은 넘기지 않습니다. [FoundryIQ](../track4/README.md)에는 현재 사용자에게 허용된 근거 ID/실제 링크/본문 요약/시각/소스 종류를 전달합니다.
+```bash
+python3 -m tools.grant_m365_consent --full-demo \
+  --admin-upn <administrator-upn> --azure-config-dir <private-azure-cli-directory>
+python3 -m tools.grant_m365_consent --full-demo \
+  --admin-upn <administrator-upn> --azure-config-dir <private-azure-cli-directory> \
+  --login --apply --confirm-tenant <exact-tenant-id>
+```
 
-## 정리와 범위
+Omit `--full-demo` from both commands if it was not used for registration. The admin token must have delegated `DelegatedPermissionGrant.ReadWrite.All` (or `Directory.ReadWrite.All`) and the signed-in administrator must have a supported Entra role. The publisher then uses the registered client ID with an interactive public-client flow to obtain a short-lived token for the required operation. For a tenant switch, preserve the old ignored config and local app/provisioning/publishing state separately, including any generated publishing config. Never use another tenant's state or copy its resource IDs into the new config.
 
-데모 콘텐츠 6개와 부여한 공유 권한만 회수합니다. 로컬 6건은 원본의 19건 시드/60개 업무 항목을 대신하는 **축소 독립 데이터**이므로 원본 워크숍 준비 완료 수량으로 사용하지 않습니다. 자동 M365 프로비저닝·업로드·실제 검색 어댑터는 포함하지 않았습니다.
+For the two-account workflow, supply a short-lived delegated `GRAPH_ACCESS_TOKEN` from an approved app and authorize the restricted user separately for search. Provisioning requires `User.Read`, `User.ReadBasic.All`, `Team.Create`, `Team.ReadBasic.All` (to poll Teams asynchronous operations), `TeamMember.Read.All`, `Channel.Create`, `Channel.ReadBasic.All`, `ChannelMember.ReadWrite.All`, `Files.ReadWrite.All`, and `Sites.ReadWrite.All`. Do not use an application token or a production tenant.
+
+Review the plan first. This makes no Graph calls:
+
+```bash
+python3 -m tools.provision_m365 --config track2/provision-config.local.json
+```
+
+Then provision by explicitly confirming the exact tenant ID:
+
+```bash
+python3 -m tools.provision_m365 \
+  --config track2/provision-config.local.json \
+  --apply \
+  --confirm-tenant <exact-tenant-id>
+```
+
+The script creates a private Team with only the publisher, relies on the Team's default SharePoint Documents library, and creates the three ACL folders in that library and the publisher's OneDrive. It creates seven shared channels; the restricted user is added only to `cs-tier2`, `logistics`, `inventory`, `payments`, and `campaign-ops`. It receives read-only folder shares for `Participants`, not `Leaders` or `Data-Stewards`. The script saves resumable progress in an ignored local state file and writes `track2/publish-config.provisioned.local.json` for the publisher. If replacing an already generated config, add `--overwrite-output`.
+
+If Team/SharePoint provisioning is still in progress, wait a few minutes and rerun the same command; do not delete the state file. For the two-account checks, sign in as both accounts before publishing and verify direct folder access and channel visibility. SharePoint inheritance or tenant sharing policy can affect effective access, so the script's successful writes alone are not proof of isolation.
+
+### Publisher-only option
+
+When a restricted account is unavailable and access-denial verification is intentionally out of scope, add `--publisher-only` to both the plan and apply commands. The `restrictedUpn` value is ignored; no restricted user is added or shared with, and no denial is tested. The Team and channels are created for the publisher only. Folder names do not enforce security: check effective permissions and inheritance before uploading content, and do not claim access isolation was validated. State created in this mode cannot be resumed in two-account mode.
+
+Publisher-only mode does not require `User.ReadBasic.All`; all other provisioning scopes above are still required.
+
+```bash
+python3 -m tools.provision_m365 --config track2/provision-config.local.json --publisher-only
+python3 -m tools.provision_m365 --config track2/provision-config.local.json \
+  --publisher-only --interactive --apply --confirm-tenant <exact-tenant-id>
+```
+
+## 2. Publish the live corpus
+
+Use `--interactive` with the `--full-demo` app, or supply a short-lived delegated `GRAPH_ACCESS_TOKEN` for `publisherUpn`. Publishing requires `User.Read`, `Files.ReadWrite.All`, `Sites.ReadWrite.All`, `Mail.Send`, and `ChannelMessage.Send`.
+
+```bash
+python3 -m tools.publish_m365 --config track2/publish-config.provisioned.local.json
+```
+
+The no-`--apply` command validates the local package and displays the planned writes without contacting Microsoft 365. After reviewing tenant, targets, folder permissions, and counts, explicitly authorize writes:
+
+```bash
+python3 -m tools.publish_m365 \
+  --config track2/publish-config.provisioned.local.json \
+  --interactive --apply \
+  --confirm-tenant <exact-tenant-id>
+```
+
+The publisher uploads documents to their pre-authorized ACL folders, sends all 15 sample emails only to the signed-in publisher's mailbox, and posts each Teams thread in its mapped channel as that publisher. It does not impersonate the sample role names or send mail to the sample recipients. Its ignored state file records publication receipts for the exact tenant, publisher, and targets so an interrupted run can resume. Preserve older receipts without target context; they can be verified read-only, but the publisher refuses to resume writes from them. The publisher backs off on explicit HTTP `429` responses; for an ambiguous failure, check the remote item before retrying to avoid duplicate posts or mail. Email `202 Accepted` means accepted for sending, not delivered or indexed.
+
+## 3. Verify live publication and search
+
+After indexing, run the publisher's read-only verification against the saved receipts:
+
+```bash
+python3 -m tools.verify_m365 --interactive
+```
+
+The verifier checks the private Team and shared channels, resolves the SharePoint and OneDrive files at their configured paths, checks exact workshop subjects in the publisher's Outlook inbox, and reads recorded Teams threads and replies. It runs Q1–Q5 against the SharePoint, OneDrive, and Outlook Microsoft Search indexes and counts only hits matched to verified samples. Teams keyword matches are computed from the live channel read-back, **not** the Teams Microsoft Search index. The command exits nonzero if a read-back check fails, a search request fails, or a scenario has no matching published hit across the three tested indexes. A single source can legitimately return no hits. No restricted-user checks are run by this command.
+
+For the separate Graph Search demo, the live Teams `chatMessage` query returned HTTP `403` with `ChannelMessage.Read.All` alone. The adapter requires that scope plus `Chat.Read` or `Chat.ReadWrite`. If Teams Microsoft Search is required, review the additional delegated `Chat.Read` approval separately; the publisher and verifier do not request it. Set:
+
+- `TRACK2_SHAREPOINT_SCOPE` and `TRACK2_ONEDRIVE_SCOPE`: KQL restrictions to the approved demo library/folders.
+- `TRACK2_OUTLOOK_SCOPE`: a KQL restriction to the demo mail scope.
+- `TRACK2_TEAMS_SCOPE`: a KQL restriction to the approved demo channels.
+
+Run a source search with the test user's delegated token:
+
+```bash
+python3 -m tools.live_demo --track work --scenario Q1
+```
+
+The Graph Search API runs as the token user. Verify the publisher can open expected source URLs. Only for the two-account checks, verify that restricted items are absent from both search and direct access for the restricted user. The query restriction is an additional search filter, not an ACL.
+
+## 4. Search the real content in the integrated demo
+
+The Q1-Q5 search terms are aligned to the Track1 metrics in [Track4 scenarios](../track4/scenarios.json). Present these search results separately in the current two-tenant setup: standalone Track 4 and the legacy `--track all` command in separate mode skip Graph and do not consume WorkIQ. The legacy same-identity flow can collect Fabric, Graph, and public-web evidence, subject to its identity and permission checks, but that is not the verified two-tenant deployment. A source outage is reported; local corpus content is never substituted for live results.
+
+Do not treat M365 narrative as a measurement or proof of causality. Preserve the source link and state its limitations alongside the Track1 metric.
+
+## Current status
+
+The read-only publisher check verified all 60 published items, including 55 Teams messages across 18 threads in seven shared channels. Q1–Q5 returned published items on SharePoint, OneDrive, and Outlook, and each scenario matched live Teams channel messages. The Teams Microsoft Search index was not verified, and second-user denial testing was intentionally omitted. See the [live results by scenario](../docs/VALIDATION.md#track2-publisher-only-read-back-2026-11-23-kst).

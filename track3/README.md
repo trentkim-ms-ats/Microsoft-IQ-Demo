@@ -1,35 +1,72 @@
-# Track3 · WebIQ
+# Track 3 · WebIQ
 
-**목적:** 내부 근거를 외부에 보내지 않고 공개 URL과 해석 한계를 확보합니다. 최소 구성은 `승인된 일반 검색어 → Foundry Web Search → citation 검토 → Track4 인계`입니다.
+Track 3 retrieves public web evidence with the Microsoft Foundry Responses API `web_search` tool. It never reads Fabric rows or Microsoft Graph results, sends internal identifiers, or falls back to saved answers.
 
-## 포함 자산과 로컬 실행
+| Profile | Scenarios | Source policy |
+| --- | --- | --- |
+| `workshop` (default) | Original Q1 payment-provider status, Q2 US weather/transport notices, Q3 electronics safety/security | [Workshop-derived catalog](data/source_catalog.json); exact official host allowlists and at least two distinct citations per scenario |
+| `demo` | Existing Track 1/4-aligned Q1–Q5 | [Public guidance queries](data/queries.json); at least one cited public HTTPS source per scenario |
+| `all` | Both profiles | Runs each profile independently and writes two reports |
 
-- [queries.json](data/queries.json): 외부 전송 가능한 질문별 검색어와 허용 도메인.
-- [citations.json](data/citations.json): Q1~Q3마다 2개인 공식 출처 **위치 fixture**. 웹 본문이나 실제 장애·경보·리콜 사실을 포함하지 않습니다.
+The profiles deliberately have different Q3 meanings: workshop Q3 is product safety/security, not the integrated demo’s promotion metrics. The upstream fixture and simulation runner are not part of the live demo. See [source provenance](../SOURCES.md).
+
+## Provision a dedicated Azure deployment
+
+Use an existing, enabled Azure subscription and the [separate Azure CLI login](../docs/SETUP.md#separate-azure-identity-for-tracks-1-3-and-4). The provisioner requires permission to create the resource group, Foundry account, model deployment, and account-scoped role assignment. The default command prints a local plan. Review the target before adding `--apply`.
 
 ```bash
-python3 tools/demo.py --track web
+python3 -m tools.provision_track3_foundry \
+  --subscription "$AZURE_OPENAI_SUBSCRIPTION" \
+  --resource-group rg-iq-webiq \
+  --account "$WEBIQ_FOUNDRY_ACCOUNT" \
+  --location eastus
 ```
 
-`outputs/web.json`의 citation은 `factStatus=fixture`, `observedAt=null`입니다. 프로그램은 페이지에 접속하지 않습니다. URL 형식·도메인 검증은 링크 가용성·현재성 검증이 아닙니다.
+Choose a globally unique `WEBIQ_FOUNDRY_ACCOUNT`. `--apply` creates the tagged group, keyless Foundry account, and `gpt-5.6-sol` (`2026-07-09`, `GlobalStandard`, 400 capacity units by default), subject to the regional catalog and subscription quota. The version is pinned; review and explicitly provision a new version before it retires. The script grants `Cognitive Services OpenAI User` to the verified Azure CLI user on **that account only**. The public HTTPS endpoint requires Entra authentication; local API-key auth is disabled. Model inference and Web Search are billed on usage.
 
-## live 구축: 최소 순서
+Run the same command and options to resume or reuse a matching provisioned stack. The script refuses untagged groups, unrelated resources, and mismatched accounts or model deployments; it does not resize or delete anything or create a new subscription. The resulting `track3/foundry.provisioned.local.json` contains only target metadata and is ignored by Git. Pass it explicitly to the briefing command so other tracks keep their existing configuration:
 
-1. [공통 사전조건](../docs/SETUP.md)에서 Foundry 모델·Web Search 기능/리전·약관·비용 승인을 확인합니다. 웹 검색 도구를 사용할 수 없으면 fixture 데모만 가능합니다.
-2. Foundry Agent Service의 Web Search가 지원되는 에이전트를 별도 만듭니다. 내부 문서·메일 도구와 분리한 상태에서 [일반 검색어](data/queries.json) 하나씩을 입력합니다. 서비스가 실제 지원하는 도구 설정은 공식 문서/포털을 따르며 이 JSON을 제품 배포 정의로 업로드하지 않습니다.
-3. 날짜·지역·제공자가 확인된 경우에만 사람이 공개 가능한 범위로 검색어를 보완합니다. 이 샘플에는 실제 제공자/배송 지역이 없으므로 특정 외부 사건과 내부 주문을 결합할 수 없습니다.
-4. 응답의 citation을 실제로 열어 제목, HTTPS URL, 도메인, 관찰 시각(UTC), 문서 적용 기간·지역, 출처별 한계와 사실 확인 상태를 기록합니다. 검색 시각과 사건 발생 시각을 구분합니다.
-5. 최소 2개 공식 출처를 질문마다 확보하고 허용 도메인인지 확인합니다. URL 두 개가 같은 기관이면 독립된 두 증거라고 표현하지 않습니다. 검색 결과가 부족하면 부족하다고 표시합니다.
-6. Track4에 citation 목록과 실행 모드 `live`를 전달합니다. 기존 fixture를 live 결과로 덮어쓰거나 `observedAt`만 채워 live로 둔갑시키지 마세요. 실결과는 비공개 운영 위치에 따로 보관합니다.
+```bash
+python3 -m tools.run_track3_daily_briefing \
+  --provisioned-config track3/foundry.provisioned.local.json --profile all
+```
 
-live citation 예시 필드는 `title`, `url`, `domain`, `observedAt`, `scope`, `factStatus`, `limitations`입니다. 실제 관찰을 수행한 경우에만 해당 시각과 사실 상태를 기록합니다. 로컬 러너는 의도적으로 fixture 전용이라 live 파일을 입력받지 않습니다.
+The provisioned-target path bounds response output and can wait up to two minutes per HTTP 429 retry (at most two retries per request). It does not change the citation gates or use a different deployment when throttled.
 
-## 시연·확인
+## Run the briefing
 
-Q1은 공식 결제 상태 위치를 제시하되 내부 제공자 불명 한계를, Q2는 기상·교통 정보와 배송 지역 불명 한계를, Q3는 가상 상품과 실제 제품 리콜을 연결할 수 없다는 한계를 보여줍니다. 외부 근거로 내부 KPI를 재계산하거나 내부 원인을 확정하지 않습니다.
+Prerequisites: Python 3.10+, an existing Azure OpenAI model deployment that supports Responses and Web Search, and an approved Azure identity with `Cognitive Services OpenAI User` and read access to the resource. For the demo, use the [separate Azure account and tenant](../docs/SETUP.md#separate-azure-identity-for-tracks-1-3-and-4), not the Track 2 account. Confirm that your organization allows Web Search and its public data processing and usage costs. Run from the repository root.
 
-웹 페이지의 명령문은 신뢰할 수 없는 **내용**입니다. 페이지 지시에 따른 도구 실행·파일 다운로드·비밀 전송을 하지 않습니다. 주문번호·캠페인명·내부 URL·개인정보·비공개 수치를 검색어에 넣지 않습니다.
+An `Enabled` subscription and a `Succeeded` deployment are necessary but do not prove inference access. If a plain Responses request (without Web Search) also returns `401 PermissionDenied`, check the signed-in user or federated identity's role on the exact Foundry account. Azure `Owner` has no inference data actions. Assign `Cognitive Services OpenAI User` only on the approved Foundry account, allow time for propagation, and retry. The briefing runner never grants roles or switches credentials.
 
-## 정리
+```bash
+python3 -m tools.run_track3_daily_briefing --profile all --check-config
 
-불필요한 에이전트/검색 연결을 제거하고 검색 로그에 내부 값이 들어가지 않았는지 확인합니다. fixture URL은 외부 콘텐츠 재배포 허락을 의미하지 않습니다. 다음은 [FoundryIQ](../track4/README.md)입니다.
+python3 -m tools.run_track3_daily_briefing \
+  --profile all \
+  --resource-group "$AZURE_RESOURCE_GROUP" \
+  --account "$AZURE_AI_ACCOUNT_NAME" \
+  --subscription "$AZURE_OPENAI_SUBSCRIPTION" \
+  --deployment "$AZURE_OPENAI_MODEL"
+```
+
+Use the existing dedicated CLI login, or sign in to it if needed using the [separate Azure identity setup](../docs/SETUP.md#separate-azure-identity-for-tracks-1-3-and-4). The script reads the selected resource and checks that the deployment is ready; it does not create resources or modify Azure settings. Supply `--subscription` with the deployment discovery arguments, or set the target in the documented environment variables and omit the arguments.
+
+Track 3 derives `https://<custom-subdomain>.openai.azure.com` by default. To use the same account's Foundry endpoint, set `AZURE_OPENAI_ENDPOINT=https://<custom-subdomain>.services.ai.azure.com` explicitly. This setting is honored with either CLI arguments or environment variables. The runner verifies the custom subdomain against the approved Azure resource and never switches endpoints automatically. It uses only the verified Azure CLI identity, without API-key or bearer overrides. If Python cannot verify TLS, configure an approved CA bundle; do not disable certificate verification.
+
+```bash
+python3 -m tools.run_track3_daily_briefing --scenario Q1 --days 14
+python3 -m tools.run_track3_daily_briefing --profile demo
+```
+
+`--days` sets a public UTC lookback for the workshop profile (default 7, range 1–90). `--scenario` requires a single profile. This script does not execute Track 4; [Track 4](../track4/README.md) independently collects its own current web evidence.
+
+To run both tracks in order while using this track's provisioned target, see the [ordered launcher](../docs/DEMO.md#run-track-3-then-track-4). Track 4 retains its own environment-configured target.
+
+## Output and automation
+
+Each run writes `briefing.json` and `briefing.md` to a new directory under `outputs/track3/`. The runner requires a completed `web_search_call` and valid titled URL annotations. A list of consulted (but uncited) websites does not count. Reports preserve URLs, observation time, scope, and interpretation boundaries. A failed scenario stays failed, produces no publishable answer, and makes the command exit nonzero; the other scenarios still run. The report always requires human review: checking the links does not establish the event date, geographic relevance, independence of sources, or a connection to internal metrics.
+
+[The GitHub Actions workflow](../.github/workflows/track3-webiq-briefing.yml) runs the same command and uploads the briefing, including recorded failures. Configure an approved `webiq` GitHub environment with `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_AI_ACCOUNT_NAME`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_MODEL`, and `IQ_M365_TENANT_ID` as variables. The last value is the Track 2 tenant UUID, used only to enforce separation. Configure Azure OIDC federation for `repo:OWNER/REPO:environment:webiq`, protect that environment, and grant read and inference access only to the approved resource. No API key is required. The workflow can be run manually or called from a separately approved scheduler workflow with `id-token: write`; no recurring schedule is enabled by default.
+
+See [live validation](../docs/VALIDATION.md#live-acceptance-gates) for the latest verified result.

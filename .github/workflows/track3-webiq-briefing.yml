@@ -1,0 +1,63 @@
+name: Track 3 WebIQ briefing
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Search profile
+        type: choice
+        options: [workshop, demo, all]
+        default: workshop
+  workflow_call:
+    inputs:
+      profile:
+        type: string
+        default: workshop
+
+permissions:
+  contents: read
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: webiq
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      WEBIQ_PROFILE: ${{ inputs.profile }}
+      AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_MODEL: ${{ vars.AZURE_OPENAI_MODEL }}
+      AZURE_OPENAI_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      AZURE_AI_ACCOUNT_NAME: ${{ vars.AZURE_AI_ACCOUNT_NAME }}
+      AZURE_CONFIG_DIR: ${{ runner.temp }}/azure-webiq
+      IQ_AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      IQ_AZURE_ACCOUNT: ${{ vars.AZURE_CLIENT_ID }}
+      IQ_M365_TENANT_ID: ${{ vars.IQ_M365_TENANT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate the public query catalog
+        run: python -m tools.run_track3_daily_briefing --profile "$WEBIQ_PROFILE" --check-config
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Run the live briefing
+        run: python -m tools.run_track3_daily_briefing --profile "$WEBIQ_PROFILE"
+      - name: Save the briefing and failure details
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: track3-webiq-briefing
+          path: outputs/track3/*/briefing.*
+          if-no-files-found: ignore
+          retention-days: 7

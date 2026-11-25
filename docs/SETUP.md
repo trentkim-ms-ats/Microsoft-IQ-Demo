@@ -1,48 +1,101 @@
-# 환경·비용·정리
+# Live environment setup
 
-## 공통 구성
+The demo has no offline-simulation mode. All presented results must come from the current Fabric, Microsoft 365 Graph, or Foundry service invocation. Prepare an isolated demo tenant and never commit tokens, tenant IDs, database names, or endpoint secrets.
 
-로컬은 Python 3.10+가 필요합니다. 원본 Track1 CSV를 처음 받을 때 인터넷이 필요하며 결과는 `outputs/`에 기록합니다.
+## Runtime
 
-live는 별도 승인된 데모 전용 환경을 사용하세요. 관리자는 아래 항목을 미리 확인하고, 실제 환경값은 Git에 추가하지 않는 로컬 기록으로 관리합니다.
+```bash
+python3 -m pip install -r requirements-live.txt
+```
 
-| 범위 | 준비물 / 최소 작업 권한 | 만들거나 기록할 것 |
+The SQL endpoint account needs read access to the Lakehouse tables. Standalone legacy setup can use `Authentication=ActiveDirectoryDefault`; the separate demo setup below binds SQL authentication to the selected Azure CLI account. Local CSV tests do not require the live dependencies.
+
+On macOS, if `mssql-python` reports that it cannot load OpenSSL even though it is installed, expose the installed library directory to the Python process. This example was verified with Homebrew's `openssl@3.5`:
+
+```bash
+DYLD_LIBRARY_PATH="$(brew --prefix openssl@3.5)/lib" python3 -m tools.run_track4_demo
+```
+
+Apply this only to the command that needs it. Keep TLS certificate verification enabled.
+If Python's HTTPS client separately reports `CERTIFICATE_VERIFY_FAILED`, use a trusted CA bundle for that invocation (for example, `SSL_CERT_FILE="$(python3 -m certifi)"` when `certifi` is installed and public roots suffice).
+
+## Separate Azure identity for Tracks 1, 3, and 4
+
+Track 2 remains in its Microsoft 365 tenant. Run FabricIQ, WebIQ, and FoundryIQ with a different Azure account and Entra tenant. Set `IQ_AZURE_TENANT_ID` to that tenant UUID and `IQ_AZURE_ACCOUNT` to its sign-in UPN (or its federated application client ID for CI). Set `AZURE_CONFIG_DIR` to a dedicated directory outside the repository, distinct from your normal Azure CLI and Track 2 caches.
+
+This separation prevents the standalone Track 4 runner from reading Track 2; it is not an end-to-end four-source integration. Sign-in, tenant consent, licenses, and access grants are prerequisites requiring authorized human action, even though the remaining deployment and validation steps have scripts.
+
+```bash
+export AZURE_CONFIG_DIR="$HOME/.azure-iq-demo"
+# Set IQ_AZURE_TENANT_ID and IQ_AZURE_ACCOUNT to your approved Azure demo identity first.
+az login --tenant "$IQ_AZURE_TENANT_ID"
+```
+
+The scripts compare the target against `track2/provision-config.local.json`. Where that file is absent, set `IQ_M365_TENANT_ID` and (for a user sign-in) `IQ_M365_ACCOUNT` to the Track 2 tenant UUID and publisher UPN. Keep these values out of Git. The checks reject the same tenant or publisher, a mismatched Azure login or token, and an inactive Foundry subscription.
+
+Set the Fabric target variables to the Lakehouse in the selected Azure demo tenant. When using an existing Foundry deployment, set `AZURE_OPENAI_SUBSCRIPTION`, `AZURE_RESOURCE_GROUP`, and `AZURE_AI_ACCOUNT_NAME`; the configured Azure OpenAI endpoint must match that resource in the enabled subscription. Do not supply a Foundry API key or bearer override in this mode. When running Track 4, the runner skips Microsoft Graph entirely and uses only Fabric and public web evidence. A new, authorized cross-tenant configuration would be needed to include Track 2 evidence.
+
+### Track 3 and Track 4 settings
+
+To create an isolated Azure resource group and model for WebIQ, use the [Track 3 Foundry provisioner](../track3/README.md#provision-a-dedicated-azure-deployment). Its optional local target file is read only when passed to the standalone Track 3 briefing; it does not change the Track 4 target.
+
+After the separate login, set these values in the same shell:
+
+| Setting | Target and access |
+| --- | --- |
+| `AZURE_OPENAI_SUBSCRIPTION`, `AZURE_RESOURCE_GROUP`, `AZURE_AI_ACCOUNT_NAME` | Explicitly selected, enabled Azure subscription and approved Foundry account. The identity needs Azure read access to the account and deployment metadata. |
+| `AZURE_OPENAI_MODEL`, optional `AZURE_OPENAI_ENDPOINT` | A ready deployment with Responses and Web Search support. The standalone Track 3 and Track 4 runners derive the endpoint from the configured account if omitted; an explicitly configured URL must match that account. The identity needs Entra inference access. |
+| `FABRIC_WORKSPACE_ID`, `FABRIC_LAKEHOUSE_ID` (Track 4 only) | IDs of the Lakehouse loaded with the 14 original Track 1 CSVs. The identity needs Fabric REST read access to the Lakehouse and `SELECT` access through its SQL analytics endpoint. |
+
+Track 3 needs only the Foundry configuration; it does not connect to Fabric. Track 4 resolves its SQL target from the selected Lakehouse metadata. `FABRIC_SQL_SERVER` and `FABRIC_SQL_DATABASE` remain inputs to the standalone SQL CLI, not the Track 4 runner. For a new Foundry deployment, [Track 4's explicit `--provision SUBSCRIPTION_ID` mode](../track4/README.md#provision-and-run-q1q5) needs only the Fabric IDs and a user login with provisioning and account-scope role assignment rights. It ignores the shared Foundry target variables and does not create, load, or change permissions on Fabric. Without `--provision`, the runner does not create deployments or change roles. No mode selects a replacement subscription: the owner must [reactivate a disabled subscription](https://learn.microsoft.com/azure/cost-management-billing/manage/subscription-disabled) or approve a replacement.
+
+## Service settings
+
+| Track | Environment/config | Required access |
 | --- | --- | --- |
-| Fabric | 용량이 연결된 Workspace, Lakehouse·Notebook 생성 권한(일반적으로 Contributor 이상), 지원되는 Ontology Preview | Workspace/Lakehouse/Ontology 식별자, 엔터티-컬럼 매핑 |
-| M365 | 샘플 계정 2개, 네 소스 사용 라이선스, 콘텐츠 생성·공유 권한, 조직에서 허용한 검색 도구 | 사이트·폴더·채널·메일의 실제 원본 링크, 사용자별 접근 확인 |
-| WebIQ | 승인된 Foundry 프로젝트, 모델, Web Search 가용성·결제 및 정책 승인 | 승인된 검색어, URL, 관찰 시각, 적용 지역/기간 |
-| Foundry | 프로젝트·모델 사용 권한과 할당량, 필요 시 별도 AI Search 지식 연결 및 해당 데이터 읽기 권한 | 모델 배포 이름, 연결 이름, 도구 계약과 응답 로그 |
+| FabricIQ | `FABRIC_SQL_SERVER`, `FABRIC_SQL_DATABASE` | Entra identity with SQL endpoint read access |
+| WorkIQ search | `GRAPH_ACCESS_TOKEN`; `TRACK2_SHAREPOINT_SCOPE`, `TRACK2_ONEDRIVE_SCOPE`, `TRACK2_OUTLOOK_SCOPE`, `TRACK2_TEAMS_SCOPE` | Short-lived delegated token; source-specific Graph read permission and source ACL |
+| WorkIQ provisioning | `--interactive` (publisher-only) or `GRAPH_ACCESS_TOKEN`; local `track2/provision-config.local.json` | Delegated `User.Read`, `Team.Create`, `Team.ReadBasic.All`, `TeamMember.Read.All`, `Channel.Create`, `Channel.ReadBasic.All`, `ChannelMember.ReadWrite.All`, `Files.ReadWrite.All`, `Sites.ReadWrite.All`; two-account setup also needs `User.ReadBasic.All` |
+| WorkIQ publishing | `--interactive` or `GRAPH_ACCESS_TOKEN`; generated `track2/publish-config.provisioned.local.json` | Delegated `User.Read`, `Files.ReadWrite.All`, `Sites.ReadWrite.All`, `Mail.Send`, `ChannelMessage.Send`; publisher-only consent |
+| WorkIQ verification | `--interactive` or `GRAPH_ACCESS_TOKEN`; generated publishing config and publication receipts | Delegated `User.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All`, `Sites.Read.All`, `Files.Read.All`, `Mail.Read` |
+| WebIQ / FoundryIQ | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_MODEL`; Azure CLI sign-in or explicit `AZURE_OPENAI_AUTH_TOKEN`/`AZURE_OPENAI_API_KEY` | Access to the approved deployment, Responses API, and Web Search tool availability |
 
-여기서 IQ는 트랙 책임을 뜻하며 단일 공통 API를 의미하지 않습니다. Microsoft Graph의 조회 API, Microsoft 365 검색 도구, Fabric SQL/Ontology, Foundry의 지식 연결은 서로 다른 구성입니다. **서비스 URL을 그대로 이 저장소의 어댑터라고 취급하지 마세요.**
+Use the minimum needed Graph search scopes: SharePoint `Sites.Read.All`, OneDrive `Files.Read.All`, and Outlook `Mail.Read`. Teams `chatMessage` search needs `ChannelMessage.Read.All` plus `Chat.Read` (or `Chat.ReadWrite`). The Track2 verifier's direct channel reads need `ChannelMessage.Read.All`, not chat-read permission. The search adapter marks a source unavailable if its delegated permission or query scope is absent. The user token is not elevated to application access.
 
-## 권한과 데이터 경계
+## Track2 prerequisites
 
-기본 경로는 포털에서 합성 자료를 수동 업로드하는 방식입니다. 앱 등록·관리자 동의·메일 자동 발송·Teams 자동 게시 스크립트는 의도적으로 제공하지 않습니다.
+In the isolated demo tenant, verify that `publisherUpn` has active Teams, SharePoint Online (including working OneDrive access), and Exchange Online service plans and an accessible mailbox. Register the single-tenant `IQ Workshop Provisioner` public client and have an authorized Entra administrator grant Microsoft Graph delegated consent **to `publisherUpn` only**, not tenant-wide. The verified run used a `Global Administrator` for consent; the publisher does not require that role when a separate administrator grants consent. See the [Track2 prerequisites](../track2/README.md#prerequisites) and the registration and consent commands in the Track2 guide.
 
-Graph 기반 별도 커넥터가 필요하면 사용하는 API별로 읽기 권한만 검토하세요. 예를 들어 메일, 파일, 사이트, 채널 메시지 조회에는 각각 `Mail.Read`, `Files.Read.All`, `Sites.Read.All`, `ChannelMessage.Read.All` 등의 권한 검토가 필요할 수 있습니다. **이 목록은 한꺼번에 부여할 권한 세트가 아닙니다.** 위임/앱 전용 지원 여부와 관리자 동의는 선택한 API 문서로 확인하세요. 배포용 쓰기·발송 권한과 런타임 조회 권한은 분리하고, 광범위한 앱 전용 권한으로 사용자 ACL을 우회하지 마세요.
+## M365 target safety
 
-실제 이메일, 고객명, 주문 데이터, 내부 URL, 토큰, 테넌트/구독 식별자는 공개 커밋·스크린샷·이슈에 넣지 않습니다. `example.invalid` 링크와 `presenter`/`guest`는 로컬 가상 값이며 실제 테넌트나 신원 체계가 아닙니다.
+Preserve ignored local state by tenant, and inspect any existing app before explicitly reusing its object ID. Create and license a separate restricted test account only if running the two-account checks; account creation and license assignment are intentionally outside the script. `python3 -m tools.provision_m365 --config track2/provision-config.local.json` prints a plan without network calls. Live creation requires `--apply` and an exact `--confirm-tenant` match. The script creates a private Team containing only the publisher, uses its default SharePoint Documents library, provisions the publisher's OneDrive, creates ACL folders, and sets read access only for the restricted user's Participants folders. It creates seven shared channels and adds that user only to the five non-leadership/non-data-quality channels. Progress is stored locally to resume asynchronous Team/channel creation.
 
-## 실행 전 게이트
+The provisioner does not change tenant-wide sharing policies, remove existing permissions, create or license accounts, or prove effective access. Verify direct folder access and channel visibility as both users before publishing; inherited SharePoint permissions and tenant policies must be checked in the target service. The generated publisher config is `track2/publish-config.provisioned.local.json`; the publisher then uploads content to those configured targets.
 
-1. 예산 소유자와 리소스 삭제 책임자를 지정합니다.
-2. Fabric/Foundry의 리전·Preview 가용성, 모델 할당량, M365 색인 가능 여부를 포털에서 확인합니다.
-3. 실제 데이터가 없는 데모 전용 위치에만 샘플을 넣습니다.
-4. 두 사용자로 원본 문서 열기와 검색 결과 차이를 확인한 후 Foundry와 연결합니다.
-5. 확인되지 않은 연결은 `미연결`로 표시합니다. 로컬 fixture 결과를 live 성공 증거로 사용하지 않습니다.
+For an explicitly selected publisher-only demonstration, `--publisher-only` skips the restricted account, sharing, and denial checks. Review effective permissions before uploading; this mode cannot establish or claim restricted-user isolation. Its saved provisioning state cannot be resumed using the two-account mode.
 
-## 비용과 정리
+The publisher sends all 15 workshop emails to the signed-in publisher's own mailbox; sample role names are displayed as text, never impersonated. It posts Teams threads as the signed-in user to configured channels. Review the write plan and pass both `--apply` and the exact `--confirm-tenant` value to publish. Do not use production or shared mailboxes.
 
-로컬 코드는 과금 API를 호출하지 않습니다. live는 Fabric 용량, 모델 토큰, Web Search, AI Search 및 로그 저장에 비용이 발생할 수 있습니다. 정확한 단가는 사용 리전·계약·시점에 따라 달라 고정 금액을 제시하지 않습니다.
+## Operational controls
 
-시연 후에는 전용 데모 연결·에이전트와 불필요한 모델 배포/검색 리소스를 검토하고, 데모 전용 Fabric 용량은 필요 시 일시 중지 또는 삭제합니다. 공유 리소스는 삭제하지 마세요. M365에서 이번에 추가한 6개 항목과 공유 권한만 제거하고 메일은 받은 편지함/보낸 편지함·휴지통 및 보존 정책도 확인합니다. 부여한 테스트 권한을 철회하고 토큰을 폐기합니다.
+- Assign a tenant owner, demo operator, budget owner, and cleanup owner.
+- Use synthetic workshop content only; do not add customer data or internal records.
+- Keep the publisher's ignored `.local.json` config and `publish_state.local.json` state file out of Git and backups shared outside the team.
+- If demonstrating two-account access controls, verify library/folder/channel ACLs with both identities before connecting Foundry.
+- Stop if a source is unsupported, the token user does not match the Fabric identity, or source restrictions cannot be applied.
+- Retire short-lived tokens after the demo. Check email retention and remove only resources created for this demo.
 
-## 제품 문서
+## Official references
 
-- [Fabric Lakehouse](https://learn.microsoft.com/fabric/data-engineering/lakehouse-overview)
-- [Microsoft Graph 권한](https://learn.microsoft.com/graph/permissions-reference)
-- [Microsoft 365 Copilot 검색 API](https://learn.microsoft.com/microsoft-365-copilot/extensibility/api/ai-services/retrieval/overview)
-- [Foundry Agent Service](https://learn.microsoft.com/azure/ai-foundry/agents/overview)
-- [Foundry Responses API](https://learn.microsoft.com/azure/ai-foundry/openai/how-to/responses)
-
-API/Preview와 포털 메뉴는 변경될 수 있습니다. 위 공식 문서와 실제 테넌트 지원 상태를 우선하세요.
+- [Fabric Lakehouse SQL analytics endpoint](https://learn.microsoft.com/fabric/data-warehouse/sql/overview)
+- [Microsoft Graph Search API](https://learn.microsoft.com/graph/search-concept-overview)
+- [Microsoft Graph permissions reference](https://learn.microsoft.com/graph/permissions-reference)
+- [Microsoft Graph create Team](https://learn.microsoft.com/graph/api/team-post?view=graph-rest-1.0)
+- [Microsoft Graph register an application](https://learn.microsoft.com/graph/api/application-post-applications?view=graph-rest-1.0)
+- [Microsoft Graph grant delegated permissions for a specific user](https://learn.microsoft.com/graph/api/oauth2permissiongrant-post?view=graph-rest-1.0)
+- [Microsoft Graph create channel](https://learn.microsoft.com/graph/api/channel-post?view=graph-rest-1.0)
+- [Microsoft Graph get channel filesFolder](https://learn.microsoft.com/graph/api/channel-get-filesfolder?view=graph-rest-1.0)
+- [Microsoft Graph create folder](https://learn.microsoft.com/graph/api/driveitem-post-children?view=graph-rest-1.0)
+- [Microsoft Graph share a drive item](https://learn.microsoft.com/graph/api/driveitem-invite?view=graph-rest-1.0)
+- [mssql-python Entra authentication](https://learn.microsoft.com/sql/connect/python/mssql-python/entra-authentication?view=sql-server-ver17)
+- [Foundry Responses API Web Search](https://learn.microsoft.com/azure/foundry/openai/how-to/web-search)

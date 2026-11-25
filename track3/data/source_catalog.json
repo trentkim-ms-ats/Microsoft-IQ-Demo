@@ -1,0 +1,28 @@
+{
+  "sourceRevision": "b16d5fd8ed481f86eb47d5d4625268ef65a7793b",
+  "minimumCitationsPerScenario": 2,
+  "humanApprovalRequired": true,
+  "scenarios": {
+    "Q1": {
+      "topic": "결제 서비스 상태",
+      "query": "Find first-party Stripe or PayPal availability notices within {period}. Distinguish the incident start from recovery and cite the original notices. If matching notices are not verified, cite the official status resources and say the incident check was inconclusive.",
+      "allowedDomains": ["status.stripe.com", "paypal-status.com", "www.paypal-status.com"],
+      "scope": "Payment providers named in the public sources; UTC search window.",
+      "boundary": "공개 장애가 확인되어도 내부 시스템의 제공자와 해당 시간대를 확인하기 전에는 결제 실패의 원인으로 연결하지 않습니다."
+    },
+    "Q2": {
+      "topic": "미국 기상·운송 공지",
+      "query": "Find official US weather or aviation disruption notices within {period}, and report the affected area and time only if verified. Cite NOAA/NWS and FAA sources. If none can be verified for the window, cite the official alert or operating-status resources and say the event check was inconclusive.",
+      "allowedDomains": ["api.weather.gov", "weather.gov", "www.weather.gov", "nasstatus.faa.gov"],
+      "scope": "US only; UTC search window. No shipment geography is assumed.",
+      "boundary": "워크샵 주문에는 실제 배송 지역이나 경로가 없으므로 미국 공지를 개별 배송 지연의 원인으로 해석하지 않습니다."
+    },
+    "Q3": {
+      "topic": "전자제품 안전·보안",
+      "query": "Find CPSC safety notices or NIST cybersecurity guidance relevant to smartphone, smartwatch or laptop categories within {period}. If no new notice is verified, cite applicable official reference material and distinguish it from new notices. Do not name or match any fictional workshop product.",
+      "allowedDomains": ["cpsc.gov", "www.cpsc.gov", "nist.gov", "www.nist.gov"],
+      "scope": "US regulatory and technical sources; product categories only.",
+      "boundary": "공개 안전·보안 자료는 범주 수준의 정보이며 워크샵 가상 제품의 리콜·보안 문제를 증명하지 않습니다."
+    }
+  }
+}

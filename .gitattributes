@@ -1,1 +1,2 @@
 track1/data/*.csv -text whitespace=cr-at-eol
+track2/data/workshop/generated/outlook/*.eml -text whitespace=cr-at-eol
